@@ -1,0 +1,14 @@
+* text=auto
+
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+*.ahk text eol=lf
+*.js text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+
+*.dll binary
+*.jpg binary

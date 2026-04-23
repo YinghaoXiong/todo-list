@@ -120,7 +120,3 @@ See:
 
 - [.gitignore](./.gitignore)
 - [.gitattributes](./.gitattributes)
-
-## License
-
-No license file has been added yet.

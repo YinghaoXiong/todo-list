@@ -119,7 +119,3 @@ Reports/2026-04-23.md
 
 - [.gitignore](./.gitignore)
 - [.gitattributes](./.gitattributes)
-
-## 说明
-
-目前仓库中尚未添加 License 文件。

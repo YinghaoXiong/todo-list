@@ -1,0 +1,16 @@
+# Local runtime data
+FocusData/
+
+# AutoHotkey temporary and backup files
+*.tmp
+*.bak
+*.old
+*.log
+*.bad-*
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/

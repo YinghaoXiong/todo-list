@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flowy Todo Pro</title>
+  <style>
+    :root {
+      --bg: linear-gradient(135deg, #ecfeff 0%, #eef2ff 58%, #f8fafc 100%);
+      --card: rgba(255, 255, 255, 0.82);
+      --solid: #ffffff;
+      --ink: #172033;
+      --muted: #64748b;
+      --primary: #0f766e;
+      --primary-2: #2563eb;
+      --green: #059669;
+      --line: rgba(15, 23, 42, 0.1);
+      --shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { width: 100%; height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Segoe UI", -apple-system, sans-serif;
+      overflow: hidden;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { font-family: inherit; }
+
+    .app {
+      width: 100%;
+      height: 100vh;
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      font-size: 20px;
+      font-weight: 900;
+      color: var(--primary);
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .nav-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .nav-btn, .back-btn, .save-btn {
+      border: 1px solid rgba(255, 255, 255, 0.75);
+      background: var(--card);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+      color: var(--ink);
+      border-radius: 10px;
+      height: 32px;
+      padding: 0 9px;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .nav-btn:hover, .back-btn:hover, .save-btn:hover { transform: translateY(-1px); }
+
+    .save-btn {
+      background: var(--primary);
+      color: white;
+      border-color: transparent;
+    }
+
+    .add-task-btn {
+      width: 34px;
+      padding: 0;
+      font-size: 20px;
+      line-height: 1;
+      color: white;
+      background: var(--primary);
+      border-color: transparent;
+    }
+
+    .view {
+      display: none;
+      min-height: 0;
+      flex: 1;
+      flex-direction: column;
+      gap: 11px;
+      overflow: hidden;
+    }
+
+    .view.active { display: flex; }
+
+    .panel {
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .task-dialog {
+      width: min(430px, calc(100vw - 36px));
+      border: 0;
+      border-radius: 18px;
+      padding: 0;
+      background: transparent;
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      max-height: calc(100vh - 36px);
+    }
+
+    .task-dialog::backdrop { background: rgba(15, 23, 42, 0.38); }
+
+    .task-dialog-card {
+      background: var(--solid);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .dialog-title {
+      font-size: 19px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .task-dialog input, .task-dialog select, .select-trigger {
+      width: 100%;
+      height: 44px;
+      border: 1px solid var(--line);
+      outline: 0;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 0 12px;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 800;
+      min-width: 0;
+    }
+
+    .task-dialog input:focus, .select-trigger[aria-expanded="true"], .select-trigger:focus-visible {
+      border-color: rgba(15, 118, 110, 0.45);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+    }
+
+    .category-picker {
+      position: relative;
+    }
+
+    .select-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .select-trigger::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid var(--muted);
+      border-bottom: 2px solid var(--muted);
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform 0.16s ease;
+      flex: 0 0 auto;
+    }
+
+    .select-trigger[aria-expanded="true"]::after {
+      transform: rotate(225deg) translateY(-2px);
+    }
+
+    .select-menu {
+      position: absolute;
+      z-index: 20;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      display: none;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+      max-height: none;
+      overflow: visible;
+    }
+
+    .select-menu.open { display: grid; gap: 3px; }
+
+    .select-option {
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      border-radius: 8px;
+      min-height: 34px;
+      padding: 0 10px;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .select-option:hover, .select-option.active {
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--primary);
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 16px;
+      padding: 0 4px;
+    }
+
+    .tab {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 900;
+      padding-bottom: 7px;
+      cursor: pointer;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tab.active { color: var(--ink); }
+
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 70%;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--primary);
+    }
+
+    .tab-count {
+      min-width: 19px;
+      height: 19px;
+      padding: 0 6px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .tab.active .tab-count {
+      background: var(--primary);
+      color: white;
+    }
+
+    .timer {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.12);
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.18s;
+    }
+
+    .timer.active { opacity: 1; }
+    .timer-bar { height: 100%; width: 0%; background: linear-gradient(90deg, var(--primary), var(--primary-2)); }
+
+    .daily-progress {
+      margin-top: auto;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      padding: 10px 0 2px;
+    }
+
+    .hour-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #d1d5db;
+    }
+
+    .hour-dot.lit:nth-child(-n + 3) { background: #7ba7e8; }
+    .hour-dot.lit:nth-child(n + 4):nth-child(-n + 6) { background: #72d6a4; }
+    .hour-dot.lit:nth-child(n + 7) { background: #f08a8a; }
+
+    .task-list {
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 2px 2px 10px;
+    }
+
+    .task-card {
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) 96px;
+      gap: 8px;
+      align-items: center;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .task-card:last-child { border-bottom: 0; }
+
+    .task-check {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      background: white;
+      color: white;
+      cursor: pointer;
+      font-weight: 900;
+    }
+
+    .task-card.done .task-check { background: var(--green); border-color: var(--green); }
+
+    .task-main { min-width: 0; }
+
+    .task-title {
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+
+    .task-card.done .task-title { text-decoration: line-through; color: var(--muted); }
+
+    .task-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .tag {
+      border-radius: 7px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .tag-code { background: #ccfbf1; color: #0f766e; }
+    .tag-paper { background: #dbeafe; color: #1d4ed8; }
+    .tag-study { background: #fef3c7; color: #b45309; }
+    .tag-other { background: #f1f5f9; color: #475569; }
+
+    .task-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    .task-btn {
+      width: 45px;
+      height: 30px;
+      border: 0;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .task-btn.start { background: var(--primary); color: white; }
+    .task-btn.abort { background: #fee2e2; color: #b91c1c; }
+    .task-btn:disabled, .task-check:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .page-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex: 0 0 auto;
+    }
+
+    .page-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .panel {
+      padding: 16px;
+      min-height: 0;
+    }
+
+    .date-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .date-row input {
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 0 12px;
+      font-weight: 800;
+      color: var(--ink);
+      background: white;
+    }
+
+    #statsView .panel, #archiveView .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chart-list, .archive-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 14px;
+      overflow-y: auto;
+      max-height: none;
+      min-height: 0;
+      padding-right: 3px;
+      flex: 1;
+    }
+
+    .stats-total {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .stats-total strong {
+      color: var(--primary);
+      font-size: 26px;
+    }
+
+    .pie-wrap {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 14px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .pie-chart {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      background: #e5e7eb;
+    }
+
+    .pie-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      gap: 7px;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .chart-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 70px;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chart-name { font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-meta { color: var(--muted); font-size: 13px; font-weight: 800; }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      border-radius: 999px;
+      padding: 1px 8px;
+      margin-left: 4px;
+      font-size: 11px;
+      font-weight: 900;
+      background: #e2e8f0;
+      color: #475569;
+      vertical-align: middle;
+    }
+    .status-pill.done {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .status-pill.doing {
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+    .chart-min { text-align: right; color: var(--primary); font-weight: 900; }
+    .chart-min.long { color: #d97706; }
+
+    .summary {
+      white-space: pre-wrap;
+      line-height: 1.55;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 9px 10px;
+      margin-bottom: 0;
+      overflow-y: auto;
+      max-height: 96px;
+      min-height: 58px;
+    }
+
+    .summary.expanded {
+      max-height: 210px;
+    }
+
+    .report-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    .report-head {
+      flex: 0 0 auto;
+      max-height: 148px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .report-head.expanded {
+      max-height: 300px;
+    }
+
+    .summary-toggle {
+      align-self: center;
+      width: 34px;
+      height: 18px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.12);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 0;
+      flex: 1;
+      resize: none;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      outline: 0;
+      line-height: 1.55;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      background: white;
+      overflow-y: auto;
+    }
+
+    .archive-item {
+      border: 1px solid var(--line);
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 900;
+      color: var(--ink);
+    }
+
+    .empty {
+      padding: 24px;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      text-align: center;
+      color: var(--muted);
+      font-weight: 900;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%) translateY(18px);
+      width: min(430px, calc(100vw - 32px));
+      background: white;
+      color: var(--ink);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+      padding: 12px 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.18s;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .reminder-dialog {
+      width: min(340px, calc(100vw - 40px));
+      border: 0;
+      border-radius: 16px;
+      padding: 0;
+      background: transparent;
+      position: fixed;
+      inset: 0;
+      margin: auto;
+    }
+
+    .reminder-dialog::backdrop { background: rgba(15, 23, 42, 0.36); }
+
+    .reminder-card {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .reminder-title {
+      color: var(--primary);
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .reminder-text {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.5;
+    }
+
+    .reminder-actions {
+      display: flex;
+      justify-content: center;
+    }
+
+    ::-webkit-scrollbar { width: 7px; }
+    ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.14); border-radius: 999px; }
+
+    @media (max-width: 480px) {
+      .app { padding: 12px; }
+      .topbar { gap: 8px; }
+      .page-head { align-items: flex-start; flex-direction: column; }
+      .task-card { grid-template-columns: 24px minmax(0, 1fr) 96px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="view active" id="taskView">
+      <header class="topbar">
+        <div class="brand" id="brandTitle">Todo</div>
+        <div class="nav-actions">
+          <button class="nav-btn" id="statsBtn" type="button">&#128202; &#32479;&#35745;</button>
+          <button class="nav-btn" id="reportBtn" type="button">&#128221; &#26085;&#25253;</button>
+          <button class="nav-btn add-task-btn" id="openAddTaskBtn" type="button" aria-label="Add task">+</button>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab" type="button" data-filter="all">&#20840;&#37096;</button>
+        <button class="tab active" type="button" data-filter="doing">&#36827;&#34892;&#20013;</button>
+        <button class="tab" type="button" data-filter="done">&#24050;&#23436;&#25104;</button>
+      </nav>
+
+      <div class="timer" id="timer"><div class="timer-bar" id="timerBar"></div></div>
+      <section class="task-list" id="taskList" aria-live="polite"></section>
+      <section class="daily-progress" id="dailyProgress" aria-label="daily full-hour progress"></section>
+    </section>
+
+    <section class="view" id="statsView">
+      <header class="page-head">
+        <h1 class="page-title">&#20170;&#26085;&#32479;&#35745;</h1>
+        <button class="back-btn" type="button" data-view="task">&#36820;&#22238;</button>
+      </header>
+      <section class="panel">
+        <div class="date-row">
+          <input id="statsDate" type="date">
+          <button class="back-btn" id="refreshStatsBtn" type="button">&#21047;&#26032;</button>
+        </div>
+        <div class="chart-list" id="statsChart"></div>
+      </section>
+    </section>
+
+    <section class="view" id="reportView">
+      <header class="page-head">
+        <h1 class="page-title">&#26085;&#25253;</h1>
+        <div class="nav-actions">
+          <button class="back-btn" id="archiveBtn" type="button">&#23384;&#26723;</button>
+          <button class="back-btn" type="button" data-view="task">&#36820;&#22238;</button>
+        </div>
+      </header>
+      <section class="panel report-panel">
+        <div class="report-head" id="reportHead">
+          <div class="date-row">
+            <input id="reportDate" type="date">
+            <button class="save-btn" id="saveReportBtn" type="button">&#20445;&#23384;</button>
+          </div>
+          <div class="summary" id="reportSummary"></div>
+          <button class="summary-toggle" id="summaryToggle" type="button" aria-label="Toggle report header" aria-expanded="false">&#8964;</button>
+        </div>
+        <textarea id="reportNotes" aria-label="daily report notes"></textarea>
+      </section>
+    </section>
+
+    <section class="view" id="archiveView">
+      <header class="page-head">
+        <h1 class="page-title">&#26085;&#25253;&#23384;&#26723;</h1>
+        <button class="back-btn" type="button" data-view="report">&#36820;&#22238;</button>
+      </header>
+      <section class="panel">
+        <div class="archive-list" id="archiveList"></div>
+      </section>
+    </section>
+  </main>
+
+  <dialog class="task-dialog" id="addTaskDialog">
+    <form class="task-dialog-card" id="taskForm" autocomplete="off">
+      <div class="dialog-title">&#28155;&#21152;&#20219;&#21153;</div>
+      <input id="taskInput" type="text" maxlength="80" placeholder="&#20219;&#21153;&#21517;&#31216;">
+      <input id="categorySelect" type="hidden" value="&#20195;&#30721;&#23454;&#39564;">
+      <div class="category-picker" id="categoryPicker">
+        <button class="select-trigger" id="categoryTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">&#20195;&#30721;&#23454;&#39564;</button>
+        <div class="select-menu" id="categoryMenu" role="listbox">
+          <button class="select-option active" type="button" role="option" data-value="&#20195;&#30721;&#23454;&#39564;" aria-selected="true">&#20195;&#30721;&#23454;&#39564;</button>
+          <button class="select-option" type="button" role="option" data-value="&#35770;&#25991;&#38405;&#35835;">&#35770;&#25991;&#38405;&#35835;</button>
+          <button class="select-option" type="button" role="option" data-value="&#30693;&#35782;&#23398;&#20064;">&#30693;&#35782;&#23398;&#20064;</button>
+          <button class="select-option" type="button" role="option" data-value="&#35770;&#25991;&#21457;&#34920;">&#35770;&#25991;&#21457;&#34920;</button>
+          <button class="select-option" type="button" role="option" data-value="&#20854;&#20182;">&#20854;&#20182;</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="back-btn" id="cancelAddTaskBtn" type="button">&#21462;&#28040;</button>
+        <button class="save-btn" type="submit">&#28155;&#21152;</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="reminder-dialog" id="reportReminderDialog">
+    <section class="reminder-card">
+      <div class="reminder-title">&#26085;&#25253;&#25552;&#37266;</div>
+      <div class="reminder-text">&#24050;&#21040;&#20170;&#26202; 21:30&#65292;&#35831;&#25776;&#20889;&#24182;&#20445;&#23384;&#20170;&#26085;&#26085;&#25253;&#12290;</div>
+      <div class="reminder-actions">
+        <button class="save-btn" id="closeReportReminderBtn" type="button">&#20851;&#38381;</button>
+      </div>
+    </section>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./app.js?v=20260423-2"></script>
+</body>
+</html>

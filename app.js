@@ -69,6 +69,7 @@ function bindElements() {
     tabs: Array.from(document.querySelectorAll(".tab")),
     statsBtn: document.getElementById("statsBtn"),
     reportBtn: document.getElementById("reportBtn"),
+    statsTitle: document.getElementById("statsTitle"),
     statsDate: document.getElementById("statsDate"),
     reportDate: document.getElementById("reportDate"),
     refreshStatsBtn: document.getElementById("refreshStatsBtn"),
@@ -146,8 +147,8 @@ function bindEvents() {
   });
 
   els.taskList.addEventListener("click", handleTaskClick);
-  els.statsBtn.addEventListener("click", () => openStatsView());
-  els.reportBtn.addEventListener("click", () => openReportView());
+  els.statsBtn.addEventListener("click", () => openStatsView(getLocalDateString()));
+  els.reportBtn.addEventListener("click", () => openReportView(getLocalDateString()));
   els.refreshStatsBtn.addEventListener("click", () => loadStats(els.statsDate.value));
   els.statsDate.addEventListener("change", () => loadStats(els.statsDate.value));
   els.reportDate.addEventListener("change", () => openReportView(els.reportDate.value));
@@ -375,12 +376,14 @@ function showView(name) {
   els.archiveView.classList.toggle("active", name === "archive");
 }
 
-async function openStatsView() {
+async function openStatsView(date = getLocalDateString()) {
   showView("stats");
+  els.statsDate.value = date || getLocalDateString();
   await loadStats(els.statsDate.value);
 }
 
 async function loadStats(date) {
+  updateStatsTitle(date);
   const result = await callAhk("GetStats", date);
   state.currentStats = result.ok ? parseMessageJson(result.message, fallbackStats(date)) : fallbackStats(date);
   if (date === getLocalDateString()) state.fullSessions = Number(state.currentStats.full_sessions || 0);
@@ -388,7 +391,11 @@ async function loadStats(date) {
   renderStatsChart(state.currentStats);
 }
 
-async function openReportView(date = els.reportDate.value) {
+function updateStatsTitle(date) {
+  els.statsTitle.textContent = date === getLocalDateString() ? "今日统计" : "历史统计";
+}
+
+async function openReportView(date = getLocalDateString()) {
   showView("report");
   setReportHeaderExpanded(false);
   els.reportDate.value = date || getLocalDateString();

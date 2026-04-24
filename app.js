@@ -664,7 +664,11 @@ function renderPie(items, total) {
 
 function buildReportDraft(stats) {
   const date = stats.date;
+  const total = Number(stats.total || 0);
+  const fullSessions = Math.max(0, Math.min(8, Number(stats.full_sessions || 0)));
   const lines = [`\u65e5\u671f\uff1a${date}`, "\u4efb\u52a1\u7edf\u8ba1\uff1a"];
+  lines.push(`\u603b\u8ba1\u4e13\u6ce8\u65f6\u95f4\uff1a${total}\u5206\u949f`);
+  lines.push(`1\u5c0f\u65f6\u4e13\u6ce8\u5b8c\u6210\u60c5\u51b5\uff1a${fullSessions}/8`);
   stats.items.forEach(item => {
     const status = item.status === "done" ? "\u5df2\u5b8c\u6210" : "\u672a\u5b8c\u6210";
     lines.push(`${item.title}\u82b1\u8d39${Number(item.minutes || 0)}\u5206\u949f\uff08${status}\uff09`);

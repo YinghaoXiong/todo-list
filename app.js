@@ -22,6 +22,7 @@ const t = {
 
 const state = {
   tasks: [],
+  ccfDeadlines: [],
   filter: "doing",
   timerLocked: false,
   activeTaskId: null,
@@ -32,9 +33,11 @@ const state = {
 };
 
 const els = {};
+const CCF_STORAGE_KEY = "flowy.ccfDeadlines";
 
 async function init() {
   bindElements();
+  loadCcfDeadlines();
   setTodayDates();
   setBrandDate();
   bindEvents();
@@ -55,6 +58,7 @@ function bindElements() {
     statsView: document.getElementById("statsView"),
     reportView: document.getElementById("reportView"),
     archiveView: document.getElementById("archiveView"),
+    ccfView: document.getElementById("ccfView"),
     brandTitle: document.getElementById("brandTitle"),
     openAddTaskBtn: document.getElementById("openAddTaskBtn"),
     addTaskDialog: document.getElementById("addTaskDialog"),
@@ -73,6 +77,17 @@ function bindElements() {
     taskList: document.getElementById("taskList"),
     dailyProgress: document.getElementById("dailyProgress"),
     tabs: Array.from(document.querySelectorAll(".tab")),
+    ccfSummaryBtn: document.getElementById("ccfSummaryBtn"),
+    ccfSummaryTitle: document.getElementById("ccfSummaryTitle"),
+    ccfSummaryDays: document.getElementById("ccfSummaryDays"),
+    ccfList: document.getElementById("ccfList"),
+    openAddCcfBtn: document.getElementById("openAddCcfBtn"),
+    addCcfDialog: document.getElementById("addCcfDialog"),
+    cancelAddCcfBtn: document.getElementById("cancelAddCcfBtn"),
+    ccfForm: document.getElementById("ccfForm"),
+    ccfNameInput: document.getElementById("ccfNameInput"),
+    ccfNoteInput: document.getElementById("ccfNoteInput"),
+    ccfDateInput: document.getElementById("ccfDateInput"),
     statsBtn: document.getElementById("statsBtn"),
     reportBtn: document.getElementById("reportBtn"),
     statsTitle: document.getElementById("statsTitle"),
@@ -157,6 +172,14 @@ function bindEvents() {
   });
 
   els.taskList.addEventListener("click", handleTaskClick);
+  els.ccfSummaryBtn.addEventListener("click", openCcfView);
+  els.openAddCcfBtn.addEventListener("click", openAddCcfDialog);
+  els.cancelAddCcfBtn.addEventListener("click", closeAddCcfDialog);
+  els.addCcfDialog.addEventListener("click", event => {
+    if (event.target === els.addCcfDialog) closeAddCcfDialog();
+  });
+  els.ccfForm.addEventListener("submit", addCcfDeadline);
+  els.ccfList.addEventListener("click", handleCcfListClick);
   els.statsBtn.addEventListener("click", () => openStatsView(getLocalDateString()));
   els.reportBtn.addEventListener("click", () => openReportView(getLocalDateString()));
   els.refreshStatsBtn.addEventListener("click", () => loadStats(els.statsDate.value));
@@ -191,6 +214,8 @@ async function runScheduledMinuteTasks(force = false) {
   await handleReportReminder(now);
   await handleReportAutosave(now);
   await refreshDateContext(now);
+  renderCcfSummary();
+  if (els.ccfView.classList.contains("active")) renderCcfList();
 }
 
 async function refreshDateContext(now = new Date()) {
@@ -314,6 +339,87 @@ function closeAddTaskDialog() {
   closeCategoryMenu();
 }
 
+function loadCcfDeadlines() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CCF_STORAGE_KEY) || "[]");
+    state.ccfDeadlines = Array.isArray(parsed)
+      ? parsed.map(normalizeCcfDeadline).filter(Boolean)
+      : [];
+  } catch {
+    state.ccfDeadlines = [];
+  }
+}
+
+function saveCcfDeadlines() {
+  localStorage.setItem(CCF_STORAGE_KEY, JSON.stringify(state.ccfDeadlines));
+}
+
+function normalizeCcfDeadline(item) {
+  const deadline = String(item.deadline || "");
+  if (!deadline || Number.isNaN(new Date(deadline).getTime())) return null;
+  return {
+    id: String(item.id || Date.now()),
+    name: String(item.name || "CCF-A"),
+    note: String(item.note || ""),
+    deadline
+  };
+}
+
+function openCcfView() {
+  showView("ccf");
+  renderCcfList();
+}
+
+function openAddCcfDialog() {
+  els.ccfNameInput.value = "";
+  els.ccfNoteInput.value = "";
+  els.ccfDateInput.value = "";
+  if (typeof els.addCcfDialog.showModal === "function") {
+    els.addCcfDialog.showModal();
+  } else {
+    els.addCcfDialog.setAttribute("open", "");
+  }
+  setTimeout(() => els.ccfNameInput.focus(), 0);
+}
+
+function closeAddCcfDialog() {
+  if (els.addCcfDialog.open) els.addCcfDialog.close();
+  else els.addCcfDialog.removeAttribute("open");
+}
+
+function addCcfDeadline(event) {
+  event.preventDefault();
+  const name = els.ccfNameInput.value.trim();
+  const note = els.ccfNoteInput.value.trim();
+  const deadline = els.ccfDateInput.value;
+  if (!name || !deadline) return;
+  if (Number.isNaN(new Date(deadline).getTime())) {
+    notify("\u8bf7\u8f93\u5165\u6709\u6548\u7684\u4f1a\u8bae\u65e5\u671f");
+    return;
+  }
+
+  state.ccfDeadlines.push({
+    id: String(Date.now()),
+    name,
+    note,
+    deadline
+  });
+  saveCcfDeadlines();
+  closeAddCcfDialog();
+  renderCcfSummary();
+  renderCcfList();
+}
+
+function handleCcfListClick(event) {
+  const button = event.target.closest("button[data-action='delete-ccf']");
+  const row = event.target.closest("[data-id]");
+  if (!button || !row) return;
+  state.ccfDeadlines = state.ccfDeadlines.filter(item => item.id !== row.dataset.id);
+  saveCcfDeadlines();
+  renderCcfSummary();
+  renderCcfList();
+}
+
 function openTaskDescriptionDialog(task) {
   els.taskDescriptionTitle.textContent = task.title;
   els.taskDescriptionContent.textContent = task.description.trim() || t.noTaskDescription;
@@ -409,6 +515,7 @@ function showView(name) {
   els.statsView.classList.toggle("active", name === "stats");
   els.reportView.classList.toggle("active", name === "report");
   els.archiveView.classList.toggle("active", name === "archive");
+  els.ccfView.classList.toggle("active", name === "ccf");
 }
 
 async function openStatsView(date = getLocalDateString()) {
@@ -507,6 +614,7 @@ function render() {
   renderTabs();
   renderTaskList();
   renderDailyProgress();
+  renderCcfSummary();
 }
 
 function renderTabs() {
@@ -550,6 +658,94 @@ function renderDailyProgress() {
     dot.className = `hour-dot ${index <= completed ? "lit" : ""}`;
     els.dailyProgress.append(dot);
   }
+}
+
+function renderCcfSummary() {
+  const nearest = nearestCcfDeadline();
+  if (!nearest) {
+    els.ccfSummaryTitle.textContent = "CCF-A";
+    els.ccfSummaryDays.hidden = true;
+    return;
+  }
+
+  const days = daysUntil(nearest.deadline);
+  els.ccfSummaryTitle.textContent = nearest.name;
+  els.ccfSummaryDays.hidden = false;
+  els.ccfSummaryDays.textContent = Math.max(0, days);
+  setDeadlineBadgeColor(els.ccfSummaryDays, days);
+}
+
+function renderCcfList() {
+  els.ccfList.innerHTML = "";
+  const items = sortedCcfDeadlines();
+  if (!items.length) {
+    els.ccfList.append(emptyNode("\u6682\u65e0 CCF-A deadline"));
+    return;
+  }
+  items.forEach(item => els.ccfList.append(renderCcfDeadline(item)));
+}
+
+function renderCcfDeadline(item) {
+  const row = document.createElement("article");
+  row.className = "ccf-item";
+  row.dataset.id = item.id;
+  const days = daysUntil(item.deadline);
+  row.innerHTML = `
+    <div class="ccf-main">
+      <div class="ccf-title-row">
+        <div class="ccf-name"></div>
+        <div class="ccf-note"></div>
+      </div>
+      <div class="ccf-meta"></div>
+    </div>
+    <button class="ccf-delete" type="button" data-action="delete-ccf" aria-label="\u5220\u9664">&times;</button>
+  `;
+  row.querySelector(".ccf-name").textContent = item.name;
+  row.querySelector(".ccf-note").textContent = item.note;
+  row.querySelector(".ccf-meta").textContent = `${formatDateTimeLabel(item.deadline)} / \u5269\u4f59${Math.max(0, days)}\u5929`;
+  return row;
+}
+
+function sortedCcfDeadlines() {
+  const now = Date.now();
+  return [...state.ccfDeadlines].sort((a, b) => {
+    const aTime = new Date(a.deadline).getTime();
+    const bTime = new Date(b.deadline).getTime();
+    const aExpired = aTime < now;
+    const bExpired = bTime < now;
+    if (aExpired !== bExpired) return aExpired ? 1 : -1;
+    return aExpired ? bTime - aTime : aTime - bTime;
+  });
+}
+
+function nearestCcfDeadline() {
+  const items = sortedCcfDeadlines();
+  if (!items.length) return null;
+  const now = Date.now();
+  return items.find(item => new Date(item.deadline).getTime() >= now) || items[0];
+}
+
+function daysUntil(deadline) {
+  const target = new Date(deadline);
+  const today = startOfLocalDay(new Date());
+  const targetDay = startOfLocalDay(target);
+  return Math.round((targetDay - today) / 86400000);
+}
+
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function setDeadlineBadgeColor(node, days) {
+  node.classList.remove("deadline-gray", "deadline-blue", "deadline-green", "deadline-red");
+  if (days <= 0) node.classList.add("deadline-red");
+  else if (days <= 7) node.classList.add("deadline-green");
+  else if (days <= 14) node.classList.add("deadline-blue");
+  else node.classList.add("deadline-gray");
+}
+
+function formatDateTimeLabel(value) {
+  return String(value || "").replace("T", " ");
 }
 
 function renderTask(task) {

@@ -160,7 +160,23 @@
       min-width: 0;
     }
 
-    .task-dialog input:focus, .select-trigger[aria-expanded="true"], .select-trigger:focus-visible {
+    .task-dialog textarea {
+      width: 100%;
+      min-height: 112px;
+      flex: initial;
+      resize: vertical;
+      border: 1px solid var(--line);
+      outline: 0;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 11px 12px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.55;
+    }
+
+    .task-dialog input:focus, .task-dialog textarea:focus, .select-trigger[aria-expanded="true"], .select-trigger:focus-visible {
       border-color: rgba(15, 118, 110, 0.45);
       box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
     }
@@ -366,12 +382,38 @@
 
     .task-meta {
       display: flex;
-      gap: 8px;
+      gap: 7px;
       align-items: center;
       flex-wrap: wrap;
       color: var(--muted);
       font-size: 11px;
       font-weight: 800;
+    }
+
+    .description-btn {
+      width: 20px;
+      height: 20px;
+      border: 0;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e2e8f0;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .description-btn.has-description {
+      background: rgba(5, 150, 105, 0.14);
+      color: var(--green);
+    }
+
+    .description-btn:hover {
+      transform: translateY(-1px);
     }
 
     .tag {
@@ -708,6 +750,66 @@
       justify-content: center;
     }
 
+    .description-dialog {
+      width: min(390px, calc(100vw - 36px));
+      border: 0;
+      border-radius: 16px;
+      padding: 0;
+      background: transparent;
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      max-height: calc(100vh - 36px);
+    }
+
+    .description-dialog::backdrop { background: rgba(15, 23, 42, 0.36); }
+
+    .description-card {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .description-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .description-title {
+      min-width: 0;
+      color: var(--primary);
+      font-size: 17px;
+      font-weight: 900;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .description-content {
+      max-height: min(50vh, 360px);
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--ink);
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.6;
+    }
+
+    .description-content.empty-description {
+      color: var(--muted);
+    }
+
     ::-webkit-scrollbar { width: 7px; }
     ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.14); border-radius: 999px; }
 
@@ -792,6 +894,7 @@
     <form class="task-dialog-card" id="taskForm" autocomplete="off">
       <div class="dialog-title">&#28155;&#21152;&#20219;&#21153;</div>
       <input id="taskInput" type="text" maxlength="80" placeholder="&#20219;&#21153;&#21517;&#31216;">
+      <textarea id="taskDescriptionInput" maxlength="4000" placeholder="任务说明与计划"></textarea>
       <input id="categorySelect" type="hidden" value="&#20195;&#30721;&#23454;&#39564;">
       <div class="category-picker" id="categoryPicker">
         <button class="select-trigger" id="categoryTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">&#20195;&#30721;&#23454;&#39564;</button>
@@ -810,6 +913,16 @@
     </form>
   </dialog>
 
+  <dialog class="description-dialog" id="taskDescriptionDialog">
+    <section class="description-card">
+      <div class="description-head">
+        <div class="description-title" id="taskDescriptionTitle">&#20219;&#21153;&#35828;&#26126;</div>
+        <button class="back-btn" id="closeTaskDescriptionBtn" type="button">&#20851;&#38381;</button>
+      </div>
+      <div class="description-content" id="taskDescriptionContent"></div>
+    </section>
+  </dialog>
+
   <dialog class="reminder-dialog" id="reportReminderDialog">
     <section class="reminder-card">
       <div class="reminder-title">&#26085;&#25253;&#25552;&#37266;</div>
@@ -821,6 +934,6 @@
   </dialog>
 
   <div class="toast" id="toast" role="status"></div>
-  <script src="./app.js?v=20260423-2"></script>
+  <script src="./app.js?v=20260424-1"></script>
 </body>
 </html>

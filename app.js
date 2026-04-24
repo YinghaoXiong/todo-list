@@ -16,7 +16,8 @@ const t = {
   saveFailed: "\u4fdd\u5b58\u5931\u8d25",
   noStats: "\u5f53\u5929\u6682\u65e0\u4e13\u6ce8\u8bb0\u5f55",
   reportSaved: "\u65e5\u62a5\u5df2\u5b58\u6863",
-  noArchive: "\u6682\u65e0\u65e5\u62a5\u5b58\u6863"
+  noArchive: "\u6682\u65e0\u65e5\u62a5\u5b58\u6863",
+  noTaskDescription: "\u6682\u65e0\u4efb\u52a1\u8bf4\u660e"
 };
 
 const state = {
@@ -60,6 +61,11 @@ function bindElements() {
     cancelAddTaskBtn: document.getElementById("cancelAddTaskBtn"),
     taskForm: document.getElementById("taskForm"),
     taskInput: document.getElementById("taskInput"),
+    taskDescriptionInput: document.getElementById("taskDescriptionInput"),
+    taskDescriptionDialog: document.getElementById("taskDescriptionDialog"),
+    taskDescriptionTitle: document.getElementById("taskDescriptionTitle"),
+    taskDescriptionContent: document.getElementById("taskDescriptionContent"),
+    closeTaskDescriptionBtn: document.getElementById("closeTaskDescriptionBtn"),
     categorySelect: document.getElementById("categorySelect"),
     categoryTrigger: document.getElementById("categoryTrigger"),
     categoryMenu: document.getElementById("categoryMenu"),
@@ -129,6 +135,10 @@ function bindEvents() {
   els.cancelAddTaskBtn.addEventListener("click", closeAddTaskDialog);
   els.addTaskDialog.addEventListener("click", event => {
     if (event.target === els.addTaskDialog) closeAddTaskDialog();
+  });
+  els.closeTaskDescriptionBtn.addEventListener("click", closeTaskDescriptionDialog);
+  els.taskDescriptionDialog.addEventListener("click", event => {
+    if (event.target === els.taskDescriptionDialog) closeTaskDescriptionDialog();
   });
   els.taskForm.addEventListener("submit", addTask);
   els.categoryTrigger.addEventListener("click", toggleCategoryMenu);
@@ -267,17 +277,20 @@ async function autoSaveReportForDate(date, phase) {
 async function addTask(event) {
   event.preventDefault();
   const title = els.taskInput.value.trim();
+  const description = els.taskDescriptionInput.value.trim();
   if (!title) return;
 
   state.tasks.unshift({
     id: String(Date.now()),
     title,
+    description,
     category: els.categorySelect.value,
     status: "doing",
     time_spent: 0
   });
 
   els.taskInput.value = "";
+  els.taskDescriptionInput.value = "";
   closeAddTaskDialog();
   state.filter = "doing";
   await persist();
@@ -286,6 +299,7 @@ async function addTask(event) {
 
 function openAddTaskDialog() {
   els.taskInput.value = "";
+  els.taskDescriptionInput.value = "";
   if (typeof els.addTaskDialog.showModal === "function") {
     els.addTaskDialog.showModal();
   } else {
@@ -298,6 +312,22 @@ function closeAddTaskDialog() {
   if (els.addTaskDialog.open) els.addTaskDialog.close();
   else els.addTaskDialog.removeAttribute("open");
   closeCategoryMenu();
+}
+
+function openTaskDescriptionDialog(task) {
+  els.taskDescriptionTitle.textContent = task.title;
+  els.taskDescriptionContent.textContent = task.description.trim() || t.noTaskDescription;
+  els.taskDescriptionContent.classList.toggle("empty-description", !task.description.trim());
+  if (typeof els.taskDescriptionDialog.showModal === "function") {
+    els.taskDescriptionDialog.showModal();
+  } else {
+    els.taskDescriptionDialog.setAttribute("open", "");
+  }
+}
+
+function closeTaskDescriptionDialog() {
+  if (els.taskDescriptionDialog.open) els.taskDescriptionDialog.close();
+  else els.taskDescriptionDialog.removeAttribute("open");
 }
 
 function toggleCategoryMenu() {
@@ -328,6 +358,11 @@ async function handleTaskClick(event) {
 
   const task = state.tasks.find(item => item.id === card.dataset.id);
   if (!task) return;
+
+  if (button.dataset.action === "description") {
+    openTaskDescriptionDialog(task);
+    return;
+  }
 
   if (button.dataset.action === "abort") {
     if (state.activeTaskId !== task.id) return;
@@ -523,12 +558,14 @@ function renderTask(task) {
   card.dataset.id = task.id;
   const locked = state.timerLocked;
   const active = state.activeTaskId === task.id;
+  const hasDescription = Boolean(task.description.trim());
 
   card.innerHTML = `
     <button class="task-check" type="button" data-action="toggle" ${locked ? "disabled" : ""}>${task.status === "done" ? "\u2713" : ""}</button>
     <div class="task-main">
       <div class="task-title"></div>
       <div class="task-meta">
+        <button class="description-btn ${hasDescription ? "has-description" : ""}" type="button" data-action="description" aria-label="\u67e5\u770b\u4efb\u52a1\u8bf4\u660e" title="\u67e5\u770b\u4efb\u52a1\u8bf4\u660e">\u2709</button>
         <span class="tag ${categoryClass(task.category)}"></span>
         <span>${t.accumulated} ${Number(task.time_spent || 0)}m</span>
       </div>
@@ -689,6 +726,7 @@ function normalizeTask(task) {
   return {
     id: String(task.id || Date.now()),
     title: String(task.title || "Untitled"),
+    description: String(task.description || ""),
     category: String(task.category || t.code),
     status: ["todo", "doing", "done"].includes(task.status) ? task.status : "doing",
     time_spent: Number(task.time_spent || 0)

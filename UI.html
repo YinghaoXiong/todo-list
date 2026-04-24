@@ -108,6 +108,10 @@
 
     .view.active { display: flex; }
 
+    #taskView {
+      gap: 5px;
+    }
+
     .panel {
       background: var(--card);
       backdrop-filter: blur(14px);
@@ -304,7 +308,7 @@
     }
 
     .timer {
-      height: 5px;
+      height: 3px;
       border-radius: 999px;
       background: rgba(15, 118, 110, 0.12);
       overflow: hidden;
@@ -344,7 +348,7 @@
     }
 
     .task-card {
-      padding: 10px 3px;
+      padding: 5px 3px 10px;
       display: grid;
       grid-template-columns: 24px minmax(0, 1fr) 96px;
       gap: 8px;

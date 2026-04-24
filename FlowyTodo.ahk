@@ -12,6 +12,8 @@ app.Run()
 
 class FlowyApp {
     __New() {
+        this.wtsSessionChangeMsg := 0x02B1
+        this.wtsSessionLock := 0x7
         this.appTitle := ""
         appTitle := this.GetTodayTitle()
         this.gui := Gui("+Resize", appTitle)
@@ -35,6 +37,9 @@ class FlowyApp {
         Hotkey("^F1", this.ShowTaskView.Bind(this))
         Hotkey("^F2", this.api.TogglePause.Bind(this.api))
         Hotkey("^F3", this.ShowStatsView.Bind(this))
+
+        OnMessage(this.wtsSessionChangeMsg, this.OnSessionChange.Bind(this))
+        try DllCall("wtsapi32\WTSRegisterSessionNotification", "ptr", this.gui.Hwnd, "uint", 0)
 
         this.RefreshDateTitle()
         SetTimer(this.RefreshDateTitle.Bind(this), 60 * 1000)
@@ -79,6 +84,13 @@ class FlowyApp {
     OnClose(*) {
         this.gui.Hide()
         return true
+    }
+
+    OnSessionChange(wParam, lParam, msg, hwnd) {
+        if (hwnd != this.gui.Hwnd)
+            return
+        if (wParam = this.wtsSessionLock)
+            this.api.CancelTimerOnSessionLock()
     }
 
     ShowMain(*) {
@@ -284,38 +296,57 @@ class FlowyAPI {
 
     CancelTimer(taskId := "") {
         try {
-            if !this.timerRunning
-                return this.Ok("no-active-timer")
+            result := this.StopActiveTimer(taskId, "stopped", false)
+            if !result["ok"]
+                throw Error(result["message"])
 
-            taskId := Trim(String(taskId))
-            if (taskId != "" && String(taskId) != String(this.timerTaskId))
-                throw Error("This task is not the active focus timer.")
-
-            activeTaskId := this.timerTaskId
-            elapsedMs := this.GetElapsedMs()
-            minutes := elapsedMs > 0 ? Max(1, Ceil(elapsedMs / 60000)) : 0
-
-            SetTimer(this.tickFn, 0)
-            this.timerRunning := false
-            this.timerPaused := false
-            this.timerTaskId := ""
-            this.timerRemainingSec := 0
-            this.pauseStartedTick := 0
-            this.totalPausedMs := 0
-            this.DestroyTimerOverlay()
-
-            if (minutes > 0) {
-                this.AppendFocusLog(activeTaskId, minutes, "stopped")
-                this.AddFocusMinutes(activeTaskId, minutes)
-                this.PushStateToUI()
-            }
-
-            this.CallJS("window.updateTimerProgress", 0, false)
+            minutes := result["minutes"]
             this.ShowPrettyAlert("Focus stopped", "Recorded " minutes " minutes before stopping.")
             return this.Ok("cancelled:" minutes)
         } catch Error as e {
             return this.Fail(e)
         }
+    }
+
+    CancelTimerOnSessionLock() {
+        result := this.StopActiveTimer("", "locked", false)
+        if result["ok"] && result["minutes"] > 0
+            TrayTip("Focus stopped because Windows was locked.", "Flowy Todo Pro", 16)
+        return result["ok"]
+    }
+
+    StopActiveTimer(taskId := "", outcome := "stopped", showUiSync := true) {
+        if !this.timerRunning
+            return Map("ok", true, "minutes", 0, "message", "no-active-timer")
+
+        taskId := Trim(String(taskId))
+        if (taskId != "" && String(taskId) != String(this.timerTaskId))
+            return Map("ok", false, "minutes", 0, "message", "This task is not the active focus timer.")
+
+        activeTaskId := this.timerTaskId
+        elapsedMs := this.GetElapsedMs()
+        minutes := elapsedMs > 0 ? Max(1, Ceil(elapsedMs / 60000)) : 0
+
+        SetTimer(this.tickFn, 0)
+        this.timerRunning := false
+        this.timerPaused := false
+        this.timerTaskId := ""
+        this.timerRemainingSec := 0
+        this.pauseStartedTick := 0
+        this.totalPausedMs := 0
+        this.DestroyTimerOverlay()
+
+        if (minutes > 0) {
+            this.AppendFocusLog(activeTaskId, minutes, outcome)
+            this.AddFocusMinutes(activeTaskId, minutes)
+            if showUiSync
+                this.PushStateToUI()
+            else
+                try this.PushStateToUI()
+        }
+
+        this.CallJS("window.updateTimerProgress", 0, false)
+        return Map("ok", true, "minutes", minutes, "message", "")
     }
 
     SaveTaskState(jsonString := "[]") {

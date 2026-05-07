@@ -311,7 +311,8 @@ async function addTask(event) {
     description,
     category: els.categorySelect.value,
     status: "doing",
-    time_spent: 0
+    time_spent: 0,
+    completed_at: ""
   });
 
   els.taskInput.value = "";
@@ -486,7 +487,13 @@ async function handleTaskClick(event) {
   if (state.timerLocked) return;
 
   if (button.dataset.action === "toggle") {
-    task.status = task.status === "done" ? "doing" : "done";
+    if (task.status === "done") {
+      task.status = "doing";
+      task.completed_at = "";
+    } else {
+      task.status = "done";
+      task.completed_at = getLocalDateString();
+    }
     await persist();
     render();
   }
@@ -618,10 +625,11 @@ function render() {
 }
 
 function renderTabs() {
+  const today = getLocalDateString();
   const counts = {
-    all: state.tasks.length,
+    all: state.tasks.filter(task => task.status !== "done" || task.completed_at === today).length,
     doing: state.tasks.filter(task => task.status !== "done").length,
-    done: state.tasks.filter(task => task.status === "done").length
+    done: state.tasks.filter(task => task.status === "done" && task.completed_at === today).length
   };
   const labels = { all: t.all, doing: t.doing, done: t.done };
   els.tabs.forEach(tab => {
@@ -637,10 +645,11 @@ function renderTabs() {
 }
 
 function renderTaskList() {
+  const today = getLocalDateString();
   const visible = state.tasks.filter(task => {
-    if (state.filter === "all") return true;
+    if (state.filter === "all") return task.status !== "done" || task.completed_at === today;
     if (state.filter === "doing") return task.status !== "done";
-    return task.status === state.filter;
+    return task.status === "done" && task.completed_at === today;
   });
   els.taskList.innerHTML = "";
   if (!visible.length) {
@@ -929,7 +938,8 @@ function normalizeTask(task) {
     description: String(task.description || ""),
     category: String(task.category || t.code),
     status: ["todo", "doing", "done"].includes(task.status) ? task.status : "doing",
-    time_spent: Number(task.time_spent || 0)
+    time_spent: Number(task.time_spent || 0),
+    completed_at: task.completed_at || ""
   };
 }
 

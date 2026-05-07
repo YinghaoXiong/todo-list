@@ -946,6 +946,7 @@ function normalizeTask(task) {
 function categoryClass(category) {
   if (category.includes("\u8bba\u6587")) return "tag-paper";
   if (category.includes("\u5b66\u4e60") || category.includes("\u77e5\u8bc6")) return "tag-study";
+  if (category.includes("\u6bcf\u65e5")) return "tag-daily";
   if (category.includes("\u5176\u4ed6")) return "tag-other";
   return "tag-code";
 }

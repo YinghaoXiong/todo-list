@@ -875,8 +875,10 @@ function buildReportDraft(stats) {
   lines.push(`\u603b\u8ba1\u4e13\u6ce8\u65f6\u95f4\uff1a${total}\u5206\u949f`);
   lines.push(`1\u5c0f\u65f6\u4e13\u6ce8\u5b8c\u6210\u60c5\u51b5\uff1a${fullSessions}/8`);
   stats.items.forEach(item => {
+    const minutes = Number(item.minutes || 0);
+    if (minutes === 0) return;
     const status = item.status === "done" ? "\u5df2\u5b8c\u6210" : "\u672a\u5b8c\u6210";
-    lines.push(`${item.title}\u82b1\u8d39${Number(item.minutes || 0)}\u5206\u949f\uff08${status}\uff09`);
+    lines.push(`${item.title}\u82b1\u8d39${minutes}\u5206\u949f\uff08${status}\uff09`);
   });
   return { summary: lines.join("\n") };
 }

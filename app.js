@@ -29,7 +29,11 @@ const state = {
   currentStats: null,
   fullSessions: 0,
   currentDate: "",
-  lastMinuteKey: ""
+  lastMinuteKey: "",
+  favoriteDates: new Set(),
+  favoritesLoaded: false,
+  calendarView: null,
+  calendarOpen: false
 };
 
 const els = {};
@@ -93,6 +97,15 @@ function bindElements() {
     statsTitle: document.getElementById("statsTitle"),
     statsDate: document.getElementById("statsDate"),
     reportDate: document.getElementById("reportDate"),
+    reportDateTrigger: document.getElementById("reportDateTrigger"),
+    reportDateLabel: document.getElementById("reportDateLabel"),
+    favoriteBtn: document.getElementById("favoriteBtn"),
+    calendarPopup: document.getElementById("calendarPopup"),
+    calTitle: document.getElementById("calTitle"),
+    calPrev: document.getElementById("calPrev"),
+    calNext: document.getElementById("calNext"),
+    calBody: document.getElementById("calBody"),
+    calToday: document.getElementById("calToday"),
     refreshStatsBtn: document.getElementById("refreshStatsBtn"),
     statsChart: document.getElementById("statsChart"),
     reportHead: document.getElementById("reportHead"),
@@ -114,7 +127,12 @@ function setTodayDates() {
   const today = getLocalDateString();
   state.currentDate = today;
   els.statsDate.value = today;
-  els.reportDate.value = today;
+  setReportDate(today);
+}
+
+function setReportDate(date) {
+  els.reportDate.value = date;
+  if (els.reportDateLabel) els.reportDateLabel.textContent = date;
 }
 
 function setBrandDate() {
@@ -185,6 +203,29 @@ function bindEvents() {
   els.refreshStatsBtn.addEventListener("click", () => loadStats(els.statsDate.value));
   els.statsDate.addEventListener("change", () => loadStats(els.statsDate.value));
   els.reportDate.addEventListener("change", () => openReportView(els.reportDate.value));
+  els.reportDateTrigger.addEventListener("click", toggleCalendar);
+  els.reportDateTrigger.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleCalendar();
+    }
+  });
+  els.favoriteBtn.addEventListener("click", toggleFavorite);
+  els.calPrev.addEventListener("click", () => shiftCalendarMonth(-1));
+  els.calNext.addEventListener("click", () => shiftCalendarMonth(1));
+  els.calTitle.addEventListener("click", () => shiftCalendarMonth(0, true));
+  els.calToday.addEventListener("click", () => selectCalendarDate(getLocalDateString()));
+  els.calBody.addEventListener("click", handleCalendarCellClick);
+  document.addEventListener("click", event => {
+    if (!state.calendarOpen) return;
+    if (event.target.closest("#calendarPopup")) return;
+    if (event.target.closest("#reportDateTrigger")) return;
+    closeCalendar();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && state.calendarOpen) closeCalendar();
+  });
+  window.addEventListener("resize", () => { if (state.calendarOpen) positionCalendar(); });
   els.saveReportBtn.addEventListener("click", saveReport);
   els.summaryToggle.addEventListener("click", toggleReportHeader);
   els.closeReportReminderBtn.addEventListener("click", closeReportReminder);
@@ -239,7 +280,7 @@ async function refreshDateContext(now = new Date()) {
   if (reportWasToday) {
     const reportHasDraft = els.reportView.classList.contains("active") && els.reportNotes.value.trim();
     if (!reportHasDraft) {
-      els.reportDate.value = today;
+      setReportDate(today);
       if (els.reportView.classList.contains("active")) await openReportView(today);
     }
   }
@@ -547,8 +588,9 @@ function updateStatsTitle(date) {
 async function openReportView(date = getLocalDateString()) {
   showView("report");
   setReportHeaderExpanded(false);
-  els.reportDate.value = date || getLocalDateString();
+  setReportDate(date || getLocalDateString());
   await loadStats(els.reportDate.value);
+  await refreshFavoriteState(els.reportDate.value);
 
   const saved = await callAhk("LoadDailyReport", els.reportDate.value);
   const loaded = saved.ok ? parseMessageJson(saved.message, { content: "" }) : { content: "" };
@@ -610,11 +652,164 @@ function renderArchive(items) {
   items.sort((a, b) => b.date.localeCompare(a.date)).forEach(item => {
     const row = document.createElement("button");
     row.className = "archive-item";
+    if (item.favorite) row.classList.add("is-favorite");
     row.type = "button";
-    row.textContent = item.date;
+    if (item.favorite) {
+      const star = document.createElement("span");
+      star.className = "archive-star";
+      star.textContent = "★";
+      row.append(star);
+    }
+    row.append(document.createTextNode(item.date));
     row.addEventListener("click", () => openReportView(item.date));
     els.archiveList.append(row);
   });
+}
+
+async function loadFavoriteDates(force = false) {
+  if (state.favoritesLoaded && !force) return state.favoriteDates;
+  const result = await callAhk("ListFavoriteReports");
+  if (result.ok) {
+    const list = parseMessageJson(result.message, []);
+    state.favoriteDates = new Set(Array.isArray(list) ? list : []);
+    state.favoritesLoaded = true;
+  }
+  return state.favoriteDates;
+}
+
+async function refreshFavoriteState(date) {
+  await loadFavoriteDates();
+  applyFavoriteButton(state.favoriteDates.has(date));
+}
+
+function applyFavoriteButton(isFavorite) {
+  els.favoriteBtn.classList.toggle("is-favorite", !!isFavorite);
+  els.favoriteBtn.setAttribute("aria-pressed", String(!!isFavorite));
+}
+
+async function toggleFavorite() {
+  const date = els.reportDate.value || getLocalDateString();
+  const willFavorite = !state.favoriteDates.has(date);
+  applyFavoriteButton(willFavorite);
+  const result = await callAhk("SetReportFavorite", date, willFavorite ? 1 : 0);
+  if (!result.ok) {
+    applyFavoriteButton(!willFavorite);
+    notify(result.message || t.saveFailed);
+    return;
+  }
+  if (willFavorite) state.favoriteDates.add(date);
+  else state.favoriteDates.delete(date);
+}
+
+function toggleCalendar() {
+  if (state.calendarOpen) closeCalendar();
+  else openCalendar();
+}
+
+async function openCalendar() {
+  await loadFavoriteDates();
+  const baseDate = parseDateString(els.reportDate.value) || new Date();
+  state.calendarView = { year: baseDate.getFullYear(), month: baseDate.getMonth() };
+  state.calendarOpen = true;
+  els.calendarPopup.style.visibility = "hidden";
+  els.calendarPopup.hidden = false;
+  renderCalendar();
+  positionCalendar();
+  els.calendarPopup.style.visibility = "";
+}
+
+function closeCalendar() {
+  state.calendarOpen = false;
+  els.calendarPopup.hidden = true;
+}
+
+function positionCalendar() {
+  const rect = els.reportDateTrigger.getBoundingClientRect();
+  const popup = els.calendarPopup;
+  const margin = 6;
+  const popupWidth = popup.offsetWidth || 280;
+  const popupHeight = popup.offsetHeight || 280;
+  let top = rect.bottom + margin;
+  if (top + popupHeight > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - margin - popupHeight);
+  }
+  let left = rect.left;
+  if (left + popupWidth > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - 8 - popupWidth);
+  }
+  popup.style.top = `${top}px`;
+  popup.style.left = `${left}px`;
+}
+
+function shiftCalendarMonth(delta, toToday = false) {
+  if (toToday) {
+    const now = new Date();
+    state.calendarView = { year: now.getFullYear(), month: now.getMonth() };
+  } else {
+    const view = state.calendarView;
+    const next = new Date(view.year, view.month + delta, 1);
+    state.calendarView = { year: next.getFullYear(), month: next.getMonth() };
+  }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const { year, month } = state.calendarView;
+  els.calTitle.textContent = `${year}年${String(month + 1).padStart(2, "0")}月 ▾`;
+
+  els.calBody.innerHTML = "";
+  const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
+  weekdays.forEach(label => {
+    const w = document.createElement("div");
+    w.className = "cal-weekday";
+    w.textContent = label;
+    els.calBody.append(w);
+  });
+
+  const firstOfMonth = new Date(year, month, 1);
+  const firstWeekday = (firstOfMonth.getDay() + 6) % 7;
+  const gridStart = new Date(year, month, 1 - firstWeekday);
+  const today = getLocalDateString();
+  const selected = els.reportDate.value;
+
+  for (let i = 0; i < 42; i++) {
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(gridStart.getDate() + i);
+    const dateStr = formatDate(cellDate);
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "cal-cell";
+    cell.dataset.date = dateStr;
+    cell.textContent = String(cellDate.getDate());
+    if (cellDate.getMonth() !== month) cell.classList.add("is-outside");
+    if (dateStr === today) cell.classList.add("is-today");
+    if (dateStr === selected) cell.classList.add("is-selected");
+    if (state.favoriteDates.has(dateStr)) cell.classList.add("is-favorite");
+    const dot = document.createElement("span");
+    dot.className = "fav-dot";
+    cell.append(dot);
+    els.calBody.append(cell);
+  }
+}
+
+function handleCalendarCellClick(event) {
+  const cell = event.target.closest(".cal-cell");
+  if (!cell) return;
+  selectCalendarDate(cell.dataset.date);
+}
+
+function selectCalendarDate(date) {
+  if (!date) return;
+  closeCalendar();
+  openReportView(date);
+}
+
+function parseDateString(str) {
+  if (!str) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function render() {
@@ -1045,7 +1240,29 @@ async function getAhk() {
     GetTimerState: async () => JSON.stringify({ ok: true, message: JSON.stringify({ running: false, paused: false, taskId: "", percent: 0 }) }),
     SaveDailyReport: async (date, content) => (localStorage.setItem(`flowy.report.${date}`, content), JSON.stringify({ ok: true, message: "saved" })),
     LoadDailyReport: async date => JSON.stringify({ ok: true, message: JSON.stringify({ date, content: localStorage.getItem(`flowy.report.${date}`) || "" }) }),
-    ListDailyReports: async () => JSON.stringify({ ok: true, message: JSON.stringify(Object.keys(localStorage).filter(k => k.startsWith("flowy.report.")).map(k => ({ date: k.replace("flowy.report.", "") }))) })
+    ListDailyReports: async () => {
+      const favs = JSON.parse(localStorage.getItem("flowy.favorites") || "[]");
+      const favSet = new Set(favs);
+      const items = Object.keys(localStorage)
+        .filter(k => k.startsWith("flowy.report."))
+        .map(k => {
+          const date = k.replace("flowy.report.", "");
+          return { date, favorite: favSet.has(date) };
+        });
+      return JSON.stringify({ ok: true, message: JSON.stringify(items) });
+    },
+    ListFavoriteReports: async () => JSON.stringify({ ok: true, message: localStorage.getItem("flowy.favorites") || "[]" }),
+    SetReportFavorite: async (date, favorite) => {
+      const favs = new Set(JSON.parse(localStorage.getItem("flowy.favorites") || "[]"));
+      if (favorite == 1 || favorite === true || favorite === "1" || favorite === "true") favs.add(date);
+      else favs.delete(date);
+      localStorage.setItem("flowy.favorites", JSON.stringify(Array.from(favs)));
+      return JSON.stringify({ ok: true, message: favs.has(date) ? "1" : "0" });
+    },
+    IsReportFavorite: async date => {
+      const favs = new Set(JSON.parse(localStorage.getItem("flowy.favorites") || "[]"));
+      return JSON.stringify({ ok: true, message: favs.has(date) ? "1" : "0" });
+    }
   };
 }
 
@@ -1061,6 +1278,9 @@ async function callAhk(method, ...args) {
     else if (method === "SaveDailyReport") raw = await ahk.SaveDailyReport(args[0] || "", args[1] || "");
     else if (method === "LoadDailyReport") raw = await ahk.LoadDailyReport(args[0] || "");
     else if (method === "ListDailyReports") raw = await ahk.ListDailyReports();
+    else if (method === "ListFavoriteReports") raw = await ahk.ListFavoriteReports();
+    else if (method === "SetReportFavorite") raw = await ahk.SetReportFavorite(args[0] || "", args[1] || 0);
+    else if (method === "IsReportFavorite") raw = await ahk.IsReportFavorite(args[0] || "");
     else throw new Error(`Unknown AHK method: ${method}`);
     return normalizeResult(raw);
   } catch (error) {

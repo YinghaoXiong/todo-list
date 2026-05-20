@@ -156,6 +156,9 @@ class FlowyApp {
         bridge.LoadDailyReport := this.api.LoadDailyReport.Bind(this.api)
         bridge.ListDailyReports := this.api.ListDailyReports.Bind(this.api)
         bridge.GenerateReport := this.api.GenerateReport.Bind(this.api)
+        bridge.ListFavoriteReports := this.api.ListFavoriteReports.Bind(this.api)
+        bridge.SetReportFavorite := this.api.SetReportFavorite.Bind(this.api)
+        bridge.IsReportFavorite := this.api.IsReportFavorite.Bind(this.api)
         bridge.TogglePause := this.api.TogglePause.Bind(this.api)
         bridge.CancelTimer := this.api.CancelTimer.Bind(this.api)
         return bridge
@@ -206,6 +209,7 @@ class FlowyAPI {
         this.reportDir := this.dataDir "\Reports"
         this.statePath := this.dataDir "\todo_state.json"
         this.logPath := this.dataDir "\focus_log.csv"
+        this.favoritesPath := this.reportDir "\_favorites.json"
 
         this.timerDurationSec := 60 * 60
         this.timerDurationMs := this.timerDurationSec * 1000
@@ -418,16 +422,89 @@ class FlowyAPI {
 
     ListDailyReports() {
         try {
+            favorites := this.LoadFavoritesMap()
             reports := []
             Loop Files this.reportDir "\*.md", "F" {
                 SplitPath(A_LoopFileName, , , , &nameNoExt)
-                if RegExMatch(nameNoExt, "^\d{4}-\d{2}-\d{2}$")
-                    reports.Push(Map("date", nameNoExt, "path", A_LoopFileFullPath))
+                if RegExMatch(nameNoExt, "^\d{4}-\d{2}-\d{2}$") {
+                    isFav := favorites.Has(nameNoExt) ? JSON.true : JSON.false
+                    reports.Push(Map("date", nameNoExt, "path", A_LoopFileFullPath, "favorite", isFav))
+                }
             }
             return this.Ok(JSON.stringify(reports))
         } catch Error as e {
             return this.Fail(e)
         }
+    }
+
+    ListFavoriteReports() {
+        try {
+            favorites := this.LoadFavoritesMap()
+            dates := []
+            for date, _ in favorites
+                dates.Push(date)
+            return this.Ok(JSON.stringify(dates))
+        } catch Error as e {
+            return this.Fail(e)
+        }
+    }
+
+    SetReportFavorite(date := "", favorite := 0) {
+        try {
+            date := this.NormalizeDate(date)
+            flag := (favorite = true) || (favorite = 1) || (favorite = "1") || (favorite = "true")
+            favorites := this.LoadFavoritesMap()
+            if flag
+                favorites[date] := true
+            else if favorites.Has(date)
+                favorites.Delete(date)
+            this.SaveFavoritesMap(favorites)
+            return this.Ok(flag ? "1" : "0")
+        } catch Error as e {
+            return this.Fail(e)
+        }
+    }
+
+    IsReportFavorite(date := "") {
+        try {
+            date := this.NormalizeDate(date)
+            favorites := this.LoadFavoritesMap()
+            return this.Ok(favorites.Has(date) ? "1" : "0")
+        } catch Error as e {
+            return this.Fail(e)
+        }
+    }
+
+    LoadFavoritesMap() {
+        result := Map()
+        if !FileExist(this.favoritesPath)
+            return result
+        try {
+            raw := Trim(FileRead(this.favoritesPath, "UTF-8"))
+            if (raw = "")
+                return result
+            data := JSON.parse(raw, false, true)
+            if !(data is Map) || !data.Has("dates")
+                return result
+            list := data["dates"]
+            if !(list is Array)
+                return result
+            for entry in list {
+                date := Trim(String(entry))
+                if RegExMatch(date, "^\d{4}-\d{2}-\d{2}$")
+                    result[date] := true
+            }
+        } catch Error {
+        }
+        return result
+    }
+
+    SaveFavoritesMap(favorites) {
+        dates := []
+        for date, _ in favorites
+            dates.Push(date)
+        payload := Map("dates", dates)
+        this.WriteTextAtomic(this.favoritesPath, JSON.stringify(payload))
     }
 
     GenerateReport() {

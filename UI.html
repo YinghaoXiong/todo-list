@@ -542,7 +542,11 @@
       align-items: center;
     }
 
-    .date-row input {
+    .date-row.has-star {
+      grid-template-columns: 1fr auto auto;
+    }
+
+    .date-row input[type="date"] {
       height: 42px;
       border-radius: 12px;
       border: 1px solid var(--line);
@@ -551,6 +555,197 @@
       color: var(--ink);
       background: white;
     }
+
+    .date-field {
+      position: relative;
+      height: 42px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: white;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px 0 12px;
+      cursor: pointer;
+      font-weight: 800;
+      color: var(--ink);
+      user-select: none;
+    }
+
+    .date-field:hover { border-color: rgba(15, 118, 110, 0.5); }
+
+    .date-field-text {
+      flex: 1;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .date-field-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: rgba(15, 118, 110, 0.08);
+      color: var(--primary);
+      font-size: 14px;
+    }
+
+    .star-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      background: white;
+      border-radius: 12px;
+      cursor: pointer;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease;
+    }
+
+    .star-btn:hover { transform: translateY(-1px); }
+
+    .star-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: none;
+      stroke: #f59e0b;
+      stroke-width: 1.8;
+      stroke-linejoin: round;
+    }
+
+    .star-btn.is-favorite svg {
+      fill: #facc15;
+      stroke: #f59e0b;
+    }
+
+    .calendar-popup {
+      position: fixed;
+      width: 280px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      user-select: none;
+    }
+
+    .calendar-popup[hidden] { display: none; }
+
+    .cal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .cal-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+    }
+
+    .cal-title:hover { background: rgba(15, 118, 110, 0.08); }
+
+    .cal-nav {
+      display: flex;
+      gap: 4px;
+    }
+
+    .cal-nav button {
+      width: 28px;
+      height: 28px;
+      border: 0;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cal-nav button:hover { background: rgba(15, 118, 110, 0.08); color: var(--ink); }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+
+    .cal-weekday {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 6px 0 4px;
+    }
+
+    .cal-cell {
+      position: relative;
+      height: 32px;
+      border: 0;
+      background: transparent;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      padding: 0;
+    }
+
+    .cal-cell.is-outside { color: #cbd5e1; font-weight: 500; }
+    .cal-cell.is-today { background: #1f2937; color: white; }
+    .cal-cell.is-selected:not(.is-today) { background: rgba(15, 118, 110, 0.15); color: var(--primary); }
+    .cal-cell:hover:not(.is-today):not(.is-selected) { background: rgba(15, 118, 110, 0.08); }
+
+    .fav-dot {
+      position: absolute;
+      top: 3px;
+      right: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f97316;
+      display: none;
+    }
+
+    .cal-cell.is-favorite .fav-dot { display: block; }
+    .cal-cell.is-today.is-favorite .fav-dot { background: #fb923c; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5); }
+
+    .cal-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    .cal-footer button {
+      border: 0;
+      background: transparent;
+      font-weight: 800;
+      font-size: 13px;
+      color: var(--primary);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .cal-footer button:hover { background: rgba(15, 118, 110, 0.08); }
+
+    .archive-item.is-favorite { border-color: #f59e0b; background: #fffbeb; }
+    .archive-item .archive-star { color: #f59e0b; margin-right: 6px; }
 
     #statsView .panel, #archiveView .panel, #ccfView .panel {
       flex: 1;
@@ -1007,8 +1202,17 @@
       </header>
       <section class="panel report-panel">
         <div class="report-head" id="reportHead">
-          <div class="date-row">
-            <input id="reportDate" type="date">
+          <div class="date-row has-star">
+            <div class="date-field" id="reportDateTrigger" role="button" tabindex="0" aria-haspopup="dialog" aria-label="&#36873;&#25321;&#26085;&#26399;">
+              <span class="date-field-text" id="reportDateLabel"></span>
+              <span class="date-field-icon" aria-hidden="true">&#128197;</span>
+            </div>
+            <input id="reportDate" type="hidden">
+            <button class="star-btn" id="favoriteBtn" type="button" aria-pressed="false" aria-label="&#25910;&#34255;&#26085;&#26399;">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 2.5l2.92 6.06 6.58.74-4.8 4.7 1.27 6.5L12 17.4l-5.97 3.1 1.27-6.5-4.8-4.7 6.58-.74L12 2.5z"/>
+              </svg>
+            </button>
             <button class="save-btn" id="saveReportBtn" type="button">&#20445;&#23384;</button>
           </div>
           <div class="summary" id="reportSummary"></div>
@@ -1099,7 +1303,21 @@
     </section>
   </dialog>
 
+  <div class="calendar-popup" id="calendarPopup" role="dialog" aria-label="&#26085;&#26399;&#36873;&#25321;" hidden>
+    <div class="cal-header">
+      <button class="cal-title" id="calTitle" type="button" aria-label="&#20999;&#25442;&#35270;&#22270;">2026&#24180;05&#26376; &#9662;</button>
+      <div class="cal-nav">
+        <button id="calPrev" type="button" aria-label="&#19978;&#19968;&#26376;">&#8593;</button>
+        <button id="calNext" type="button" aria-label="&#19979;&#19968;&#26376;">&#8595;</button>
+      </div>
+    </div>
+    <div class="cal-grid" id="calBody"></div>
+    <div class="cal-footer">
+      <button id="calToday" type="button">&#20170;&#22825;</button>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status"></div>
-  <script src="./app.js?v=20260424-2"></script>
+  <script src="./app.js?v=20260520-1"></script>
 </body>
 </html>
